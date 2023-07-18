@@ -42,7 +42,7 @@ class MTMInterface:
         self.master_left_gripper_js_subscriber = rospy.Subscriber("/MTML/gripper/measured_js", JointState, self.MTMLGrippercallback)
         self.L_gripper_state_publisher = rospy.Publisher('/Tele/MTML/GripperJointState', JointState, queue_size=1)
         
-        self.rate = rospy.Rate(5)
+        self.rate = rospy.Rate(20)
         
     def MTMRDeltaTransCallback(self, msg):
         # =============== msg.transform.translation.x y z
