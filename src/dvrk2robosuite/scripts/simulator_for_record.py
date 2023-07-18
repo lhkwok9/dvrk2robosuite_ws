@@ -72,9 +72,9 @@ class Simulator:
         
         # some hyperparameter
         # postion sensitivity
-        self.lx = 30e2
+        self.lx = 35e2
         self.ly = 20e2
-        self.lz = 10e2
+        self.lz = 15e2
         
         # full action command
         self.SimulatorRightAction = np.zeros(7)
