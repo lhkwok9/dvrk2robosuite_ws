@@ -1,0 +1,4 @@
+<launch>
+  <node name="joint_state_publisher" pkg="dvrk2robosuite" type="simulator.py" output="screen"/>
+  <node name="robot_state_publisher" pkg="dvrk2robosuite" type="MTMInterface.py" output="screen"/>
+</launch>

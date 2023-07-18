@@ -1,0 +1,4 @@
+<launch>
+  <node name="simulator_record" pkg="dvrk2robosuite" type="simulator_for_record.py" output="screen"/>
+  <node name="MTMInterface" pkg="dvrk2robosuite" type="MTMInterface.py" output="screen"/>
+</launch>
