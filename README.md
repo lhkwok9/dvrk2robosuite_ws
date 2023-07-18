@@ -22,9 +22,9 @@ source ./devel/setup.bash
 roslaunch dvrk2robosuite teleop.launch
 ```
 or
-'''
+```
 roslaunch dvrk2robosuite teleop_record.launch
-'''
+```
 for data record
 
 ## Some Useful CMD
