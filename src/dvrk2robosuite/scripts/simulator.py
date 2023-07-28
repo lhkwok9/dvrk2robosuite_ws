@@ -22,7 +22,7 @@ controller_setting_fpath = os.path.join( os.path.dirname( os.path.dirname( os.pa
 controller_config = load_controller_config(custom_fpath=controller_setting_fpath)
 
 config = {
-    "env_name": "PickPlaceCan", #NutAssemblySingle PickPlace
+    "env_name": "NutAssembly", #NutAssemblySingle PickPlace
     "robots": "Panda",
     "controller_configs": controller_config,
 }
@@ -72,9 +72,14 @@ class Simulator:
         
         # some hyperparameter
         # postion sensitivity
-        self.lx = 35e2
-        self.ly = 20e2
-        self.lz = 15e2
+        self.lx = 25e2
+        self.ly = 15e2
+        self.lz = 10e2
+        
+        # rotation sensitivity
+        self.rx = 1e2
+        self.ry = 1e2
+        self.rz = 1e2
         
         # full action command
         self.SimulatorRightAction = np.zeros(7)
@@ -102,9 +107,9 @@ class Simulator:
         self.SimulatorRightTransAction[2] = msg.transform.translation.z * self.lz
         
         # delta orientation of MTMR EE
-        self.MTMRDeltaEEOrien_qaut[0] = msg.transform.rotation.x
-        self.MTMRDeltaEEOrien_qaut[1] = msg.transform.rotation.y
-        self.MTMRDeltaEEOrien_qaut[2] = msg.transform.rotation.z
+        self.MTMRDeltaEEOrien_qaut[0] = msg.transform.rotation.x * self.rx
+        self.MTMRDeltaEEOrien_qaut[1] = msg.transform.rotation.y * self.ry
+        self.MTMRDeltaEEOrien_qaut[2] = msg.transform.rotation.z * self.rz
         self.MTMRDeltaEEOrien_qaut[3] = msg.transform.rotation.w
         
     
@@ -116,13 +121,17 @@ class Simulator:
         yaw = msg.position[2]        
         raw_drotation = np.array([roll, pitch, yaw])
         drotation = raw_drotation[[0, 1, 2]]
+        print(f'rpy {drotation=}')
         drotation = T.mat2quat( T.euler2mat(drotation)  ) # master ee quat
+        print(f'rpy2quat {drotation=}')
         
         # using quat
         # drotation = self.MTMRDeltaEEOrien_qaut
         
         drotation =  T.quat2mat(self.ee_orien_quat) @ T.quat2axisangle(drotation)
+        print(f'quat2sim {drotation=}')
         # drotation *= 5.
+        # print(f'after 5 {drotation=}')
         
         # orientation using quat
         # self.SimulatorRightWristAction[0] = 0*5*drotation[2] # roll
@@ -130,12 +139,12 @@ class Simulator:
         # self.SimulatorRightWristAction[2] =  30*drotation[1] # yaw
         
         # orientation only using pure yaw
-        self.SimulatorRightWristAction[2] =  0*30*drotation[2] # yaw
+        # self.SimulatorRightWristAction[2] =  -140*drotation[2] # yaw
         
         # orientation using all angles 
-        # self.SimulatorRightWristAction[0] = 5*drotation[0] # roll
-        # self.SimulatorRightWristAction[1] = 10*drotation[1] # pitch
-        # self.SimulatorRightWristAction[2] =  30*drotation[2] # yaw
+        self.SimulatorRightWristAction[0] = 50*drotation[2] # roll
+        self.SimulatorRightWristAction[1] = 50*drotation[1] # pitch
+        self.SimulatorRightWristAction[2] = 50*drotation[0] # yaw
 
         
         
@@ -154,9 +163,12 @@ class Simulator:
         self.SimulatorRightAction[2] = self.SimulatorRightTransAction[2]
 
         # orientation
-        self.SimulatorRightAction[3] = self.SimulatorRightWristAction[0]
-        self.SimulatorRightAction[4] = self.SimulatorRightWristAction[1]
-        self.SimulatorRightAction[5] = self.SimulatorRightWristAction[2]
+        # self.SimulatorRightAction[3] = self.SimulatorRightWristAction[0]
+        # self.SimulatorRightAction[4] = self.SimulatorRightWristAction[1]
+        # self.SimulatorRightAction[5] = self.SimulatorRightWristAction[2]
+        self.SimulatorRightAction[3] = -self.MTMRDeltaEEOrien_qaut[1]
+        self.SimulatorRightAction[4] = self.MTMRDeltaEEOrien_qaut[0]
+        self.SimulatorRightAction[5] = self.MTMRDeltaEEOrien_qaut[2]
         
         # gripper
         self.SimulatorRightAction[6] = -self.SimulatorRightGripperAction
