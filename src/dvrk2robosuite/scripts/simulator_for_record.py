@@ -26,7 +26,7 @@ controller_setting_fpath = os.path.join( os.path.dirname( os.path.dirname( os.pa
 controller_config = load_controller_config(custom_fpath=controller_setting_fpath)
 
 config = {
-    "env_name": "PickPlaceCan", #NutAssemblySingle PickPlace
+    "env_name": "NutAssemblySquare", #NutAssemblySingle PickPlace
     "robots": "Panda",
     "controller_configs": controller_config,
 }
@@ -72,9 +72,14 @@ class Simulator:
         
         # some hyperparameter
         # postion sensitivity
-        self.lx = 35e2
-        self.ly = 20e2
+        self.lx = 15e2
+        self.ly = 15e2
         self.lz = 15e2
+        
+        # rotation sensitivity
+        self.rx = 80
+        self.ry = 80
+        self.rz = 110
         
         # full action command
         self.SimulatorRightAction = np.zeros(7)
@@ -101,9 +106,9 @@ class Simulator:
         self.SimulatorRightTransAction[2] = msg.transform.translation.z * self.lz
         
         # delta orientation of MTMR EE
-        self.MTMRDeltaEEOrien_qaut[0] = msg.transform.rotation.x
-        self.MTMRDeltaEEOrien_qaut[1] = msg.transform.rotation.y
-        self.MTMRDeltaEEOrien_qaut[2] = msg.transform.rotation.z
+        self.MTMRDeltaEEOrien_qaut[0] = msg.transform.rotation.x * self.rx
+        self.MTMRDeltaEEOrien_qaut[1] = msg.transform.rotation.y * self.ry
+        self.MTMRDeltaEEOrien_qaut[2] = msg.transform.rotation.z * self.rz
         self.MTMRDeltaEEOrien_qaut[3] = msg.transform.rotation.w
         # json.dumps(config)
     
@@ -155,9 +160,12 @@ class Simulator:
         self.SimulatorRightAction[2] = self.SimulatorRightTransAction[2]
 
         # orientation
-        self.SimulatorRightAction[3] = self.SimulatorRightWristAction[0]
-        self.SimulatorRightAction[4] = self.SimulatorRightWristAction[1]
-        self.SimulatorRightAction[5] = self.SimulatorRightWristAction[2]
+        # self.SimulatorRightAction[3] = self.SimulatorRightWristAction[0]
+        # self.SimulatorRightAction[4] = self.SimulatorRightWristAction[1]
+        # self.SimulatorRightAction[5] = self.SimulatorRightWristAction[2]
+        self.SimulatorRightAction[3] = -self.MTMRDeltaEEOrien_qaut[1]
+        self.SimulatorRightAction[4] = self.MTMRDeltaEEOrien_qaut[0]
+        self.SimulatorRightAction[5] = self.MTMRDeltaEEOrien_qaut[2]
         
         # gripper
         self.SimulatorRightAction[6] = -self.SimulatorRightGripperAction

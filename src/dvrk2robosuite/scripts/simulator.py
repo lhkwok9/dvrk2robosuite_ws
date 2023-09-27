@@ -22,7 +22,8 @@ controller_setting_fpath = os.path.join( os.path.dirname( os.path.dirname( os.pa
 controller_config = load_controller_config(custom_fpath=controller_setting_fpath)
 
 config = {
-    "env_name": "NutAssembly", #NutAssemblySingle PickPlace
+    "env_name": "NutAssemblySquare", #Lift, Stack, NutAssembly, NutAssemblySingle, NutAssemblySquare, NutAssemblyRound
+    # PickPlace, PickPlaceSingle, PickPlaceMilk, PickPlaceBread, PickPlaceCereal, PickPlaceCan, Door
     "robots": "Panda",
     "controller_configs": controller_config,
 }
@@ -72,14 +73,14 @@ class Simulator:
         
         # some hyperparameter
         # postion sensitivity
-        self.lx = 25e2
+        self.lx = 15e2
         self.ly = 15e2
-        self.lz = 10e2
+        self.lz = 15e2
         
         # rotation sensitivity
-        self.rx = 1e2
-        self.ry = 1e2
-        self.rz = 1e2
+        self.rx = 80
+        self.ry = 80
+        self.rz = 80
         
         # full action command
         self.SimulatorRightAction = np.zeros(7)
@@ -121,15 +122,15 @@ class Simulator:
         yaw = msg.position[2]        
         raw_drotation = np.array([roll, pitch, yaw])
         drotation = raw_drotation[[0, 1, 2]]
-        print(f'rpy {drotation=}')
+        # print(f'rpy {drotation=}')
         drotation = T.mat2quat( T.euler2mat(drotation)  ) # master ee quat
-        print(f'rpy2quat {drotation=}')
+        # print(f'rpy2quat {drotation=}')
         
         # using quat
         # drotation = self.MTMRDeltaEEOrien_qaut
         
         drotation =  T.quat2mat(self.ee_orien_quat) @ T.quat2axisangle(drotation)
-        print(f'quat2sim {drotation=}')
+        # print(f'quat2sim {drotation=}')
         # drotation *= 5.
         # print(f'after 5 {drotation=}')
         
