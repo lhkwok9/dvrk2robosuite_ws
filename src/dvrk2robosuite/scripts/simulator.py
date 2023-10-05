@@ -22,7 +22,7 @@ controller_setting_fpath = os.path.join( os.path.dirname( os.path.dirname( os.pa
 controller_config = load_controller_config(custom_fpath=controller_setting_fpath)
 
 config = {
-    "env_name": "NutAssemblySquare", #Lift, Stack, NutAssembly, NutAssemblySingle, NutAssemblySquare, NutAssemblyRound
+    "env_name": "NutAssembly", #Lift, Stack, NutAssembly, NutAssemblySingle, NutAssemblySquare, NutAssemblyRound
     # PickPlace, PickPlaceSingle, PickPlaceMilk, PickPlaceBread, PickPlaceCereal, PickPlaceCan, Door
     "robots": "Panda",
     "controller_configs": controller_config,
@@ -108,8 +108,8 @@ class Simulator:
         self.SimulatorRightTransAction[2] = msg.transform.translation.z * self.lz
         
         # delta orientation of MTMR EE
-        self.MTMRDeltaEEOrien_qaut[0] = msg.transform.rotation.x * self.rx
-        self.MTMRDeltaEEOrien_qaut[1] = msg.transform.rotation.y * self.ry
+        self.MTMRDeltaEEOrien_qaut[0] = -msg.transform.rotation.y * self.ry
+        self.MTMRDeltaEEOrien_qaut[1] = msg.transform.rotation.x * self.rx
         self.MTMRDeltaEEOrien_qaut[2] = msg.transform.rotation.z * self.rz
         self.MTMRDeltaEEOrien_qaut[3] = msg.transform.rotation.w
         
@@ -167,8 +167,8 @@ class Simulator:
         # self.SimulatorRightAction[3] = self.SimulatorRightWristAction[0]
         # self.SimulatorRightAction[4] = self.SimulatorRightWristAction[1]
         # self.SimulatorRightAction[5] = self.SimulatorRightWristAction[2]
-        self.SimulatorRightAction[3] = -self.MTMRDeltaEEOrien_qaut[1]
-        self.SimulatorRightAction[4] = self.MTMRDeltaEEOrien_qaut[0]
+        self.SimulatorRightAction[3] = self.MTMRDeltaEEOrien_qaut[0]
+        self.SimulatorRightAction[4] = self.MTMRDeltaEEOrien_qaut[1]
         self.SimulatorRightAction[5] = self.MTMRDeltaEEOrien_qaut[2]
         
         # gripper
