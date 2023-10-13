@@ -5,11 +5,16 @@ import copy
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import TransformStamped as transform
 import robosuite.utils.transform_utils as T
+import tf
+import tf2_ros
 
 
 class MTMInterface:
     def __init__(self):
         # ======================= MTMR ==========================================
+        # Transformation matrix of the operator's reference frame measured from Base frame of MTM device
+        self.RotationB2R = np.identity(3)
+        
         # master Right EE translation
         self.MTMRCurrentTranslation = np.zeros(3)
         self.MTMRPreviousTranslation = np.zeros(3)
@@ -20,6 +25,9 @@ class MTMInterface:
         self.MTMRPreviousEEOrien_quat = np.array([0.,0.,0.,1.])
         self.MTMRDeltaEEOrien_qaut = np.array([0.,0.,0.,1.])
         
+        # master Right EE rotation
+        self.MTMRCurrentEEOrien_rotm = np.identity(3)
+        
         # master Right wrist joint pos
         self.MTMRCurrentWristJointPos = np.zeros(3)
         self.MTMRPreviousWristJointPos = np.zeros(3)
@@ -28,11 +36,24 @@ class MTMInterface:
         # master Right gripper pos
         self.MTMRGripperPos = 0.0
         
-        self.master_ee_pos_subscriber = rospy.Subscriber("/MTMR/measured_cp", transform, self.MTMRDeltaTransCallback)
-        self.master_gripper_js_subscriber = rospy.Subscriber("/MTMR/gripper/measured_js", JointState, self.MTMRGrippercallback)
-        self.master_js_subscriber = rospy.Subscriber("/MTMR/measured_js", JointState, self.MTMRDeltaWristCallback)
+        # master Right EE Initial translation
+        self.MTMRInitialTranslation = np.zeros(3)
         
-        self.R_trans_publisher = rospy.Publisher('/Tele/MTMR/DeltaTranslation', transform, queue_size=1)
+        self.master_ee_transform_subscriber = rospy.Subscriber("/MTMR/measured_cp", transform, self.MTMRTransformCallback)
+        self.master_gripper_js_subscriber = rospy.Subscriber("/MTMR/gripper/measured_js", JointState, self.MTMRGrippercallback)
+        
+        # ======================= SimulatorR ==========================================
+        self.SimulatorRInitialT = transform()
+        self.SimulatorRInitialTranslation = np.zeros(3)
+        self.SimulatorRInitialQuat = np.array([0.,0.,0.,1.])
+        self.SimulatorRInitialRotm = np.identity(3)
+        
+        # subscriber of initial values
+        self.init_subscriber = True
+        self.R_trans_init_subscriber = rospy.Subscriber('/Tele/SimulatorR/InitialTranslation', transform, self.SimulatorRInitialTCallback)
+        
+        self.R_Dtrans_publisher = rospy.Publisher('/Tele/MTMR/DeltaTranslation', transform, queue_size=1)
+        self.R_transform_publisher = rospy.Publisher('/Tele/MTMR/TransformBase2Refence', transform, queue_size=1)
         self.R_gripper_state_publisher = rospy.Publisher('/Tele/MTMR/GripperJointState', JointState, queue_size=1)
         self.R_wrist_roll_publisher = rospy.Publisher('/Tele/MTMR/DeltaWristJoint', JointState, queue_size=1)
         
@@ -44,37 +65,38 @@ class MTMInterface:
         
         self.rate = rospy.Rate(20)
         
-    def MTMRDeltaTransCallback(self, msg):
+    def MTMRTransformCallback(self, msg):
         # =============== msg.transform.translation.x y z
         self.MTMRCurrentTranslation[0] = msg.transform.translation.x
         self.MTMRCurrentTranslation[1] = msg.transform.translation.y
         self.MTMRCurrentTranslation[2] = msg.transform.translation.z
 
         # =============== msg.transform.rotation.x y z w
-        self.MTMRCurrentEEOrien_quat[0] = msg. transform.rotation.x
-        self.MTMRCurrentEEOrien_quat[1] = msg. transform.rotation.y
-        self.MTMRCurrentEEOrien_quat[2] = msg. transform.rotation.z
-        self.MTMRCurrentEEOrien_quat[3] = msg. transform.rotation.w
+        self.MTMRCurrentEEOrien_quat[0] = msg.transform.rotation.x
+        self.MTMRCurrentEEOrien_quat[1] = msg.transform.rotation.y
+        self.MTMRCurrentEEOrien_quat[2] = msg.transform.rotation.z
+        self.MTMRCurrentEEOrien_quat[3] = msg.transform.rotation.w
         
-        # =============== Calculate the delta translation of MTMR EE
-        self.MTMRDeltaTranslation = self.MTMRCurrentTranslation - self.MTMRPreviousTranslation
-        self.MTMRPreviousTranslation = copy.deepcopy( self.MTMRCurrentTranslation )
+        # =============== Calculate the translation of MTMR EE
+        self.MTMRDeltaTranslation = self.MTMRCurrentTranslation - self.MTMRInitialTranslation
+        self.MTMRDeltaTranslation = self.RotationB2R @ self.MTMRDeltaTranslation
         
-        # =============== Calculate the delta orientation in quat of MTMR EE; delat_quat = q1 * inv(q2)
-        self.MTMRDeltaEEOrien_qaut = T.quat_multiply(self.MTMRCurrentEEOrien_quat, T.quat_inverse(self.MTMRPreviousEEOrien_quat))
-        self.MTMRPreviousEEOrien_quat = copy.deepcopy(self.MTMRCurrentEEOrien_quat)
+        # =============== Calculate the rotation of MTMR EE
+        self.MTMRCurrentEEOrien_rotm = T.quat2mat(self.MTMRCurrentEEOrien_quat)
+        self.MTMRCurrentEEOrien_rotm = self.RotationB2R @ self.MTMRCurrentEEOrien_rotm
         
         # publish the delta translation as well as the delta quat
-        tDiff = transform()
-        tDiff.transform.translation.x = self.MTMRDeltaTranslation[0]
-        tDiff.transform.translation.y = self.MTMRDeltaTranslation[1]
-        tDiff.transform.translation.z = self.MTMRDeltaTranslation[2]
-        tDiff.transform.rotation.x = self.MTMRDeltaEEOrien_qaut[0]
-        tDiff.transform.rotation.y = self.MTMRDeltaEEOrien_qaut[1]
-        tDiff.transform.rotation.z = self.MTMRDeltaEEOrien_qaut[2]
-        tDiff.transform.rotation.w = self.MTMRDeltaEEOrien_qaut[3]
-        self.R_trans_publisher.publish(tDiff)
-    
+        reference_MTMR_pose = T.make_pose(self.MTMRDeltaTranslation, self.MTMRCurrentEEOrien_rotm)
+        reference_MTMR_tarns, reference_MTMR_quat = T.mat2pose(reference_MTMR_pose) # need check for losing precision upon multiple conversions
+        referenceT = transform()
+        referenceT.transform.translation.x = reference_MTMR_tarns[0]
+        referenceT.transform.translation.y = reference_MTMR_tarns[1]
+        referenceT.transform.translation.z = reference_MTMR_tarns[2]
+        referenceT.transform.rotation.x = reference_MTMR_quat[0]
+        referenceT.transform.rotation.y = reference_MTMR_quat[1]
+        referenceT.transform.rotation.z = reference_MTMR_quat[2]
+        referenceT.transform.rotation.w = reference_MTMR_quat[3]
+        self.R_transform_publisher.publish(referenceT)
     
     def MTMRGrippercallback(self, msg):
         self.MTMRGripperPos = msg.position[0]
@@ -83,21 +105,6 @@ class MTMInterface:
         right_gripper_joint_state = JointState()
         right_gripper_joint_state.position = [self.MTMRGripperPos]
         self.R_gripper_state_publisher.publish(right_gripper_joint_state)
-    
-    
-    def MTMRDeltaWristCallback(self, msg):
-        self.MTMRCurrentWristJointPos[0] = msg.position[4]
-        self.MTMRCurrentWristJointPos[1] = msg.position[5]
-        self.MTMRCurrentWristJointPos[2] = msg.position[6]
-        
-        self.MTMRDeltaWristJointPos = self.MTMRCurrentWristJointPos - self.MTMRPreviousWristJointPos
-        
-        self.MTMRPreviousWristJointPos = copy.deepcopy( self.MTMRCurrentWristJointPos ) 
-        
-        # publish
-        wristJointDiff = JointState()
-        wristJointDiff.position = [self.MTMRDeltaWristJointPos[0], self.MTMRDeltaWristJointPos[1], self.MTMRDeltaWristJointPos[2]]
-        self.R_wrist_roll_publisher.publish(wristJointDiff)
         
     def MTMLGrippercallback(self, msg):
         self.MTMLGripperPos = msg.position[0]
@@ -106,6 +113,17 @@ class MTMInterface:
         left_gripper_joint_state.position = [self.MTMLGripperPos]
         self.L_gripper_state_publisher.publish(left_gripper_joint_state)
         
+    def SimulatorRInitialTCallback(self, msg):
+        if self.init_subscriber:
+            self.SimulatorRInitialT = msg
+            self.SimulatorRInitialTranslation[0] = self.SimulatorRInitialT.transform.translation.x
+            self.SimulatorRInitialTranslation[1] = self.SimulatorRInitialT.transform.translation.y
+            self.SimulatorRInitialTranslation[2] = self.SimulatorRInitialT.transform.translation.z
+            
+            self.MTMRInitialTranslation[0] = self.MTMRCurrentTranslation[0]
+            self.MTMRInitialTranslation[1] = self.MTMRCurrentTranslation[1]
+            self.MTMRInitialTranslation[2] = self.MTMRCurrentTranslation[2]
+            self.init_subscriber = False
         
 if __name__ == "__main__":
     rospy.init_node('Teleoperation_Interface', anonymous=False)
